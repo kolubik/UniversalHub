@@ -1,0 +1,47 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Public profile and private role information for a user",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "name": { "type": "string" },
+        "bio": { "type": "string" },
+        "stack": { "type": "array" },
+        "hardSkills": { "type": "array" },
+        "softSkills": { "type": "array" },
+        "experience": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "admin"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "name", "role", "createdAt"]
+    },
+    "Certificate": {
+      "title": "Professional Certificate",
+      "description": "A certificate uploaded by a user for verification",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "title": { "type": "string" },
+        "issuer": { "type": "string" },
+        "date": { "type": "string" },
+        "pdfUrl": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "verified", "rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "issuer", "pdfUrl", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile records"
+    },
+    "/certificates/{certId}": {
+      "schema": "Certificate",
+      "description": "Global certificates collection for moderation"
+    }
+  }
+}

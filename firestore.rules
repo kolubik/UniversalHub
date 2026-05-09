@@ -1,0 +1,73 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Users Collection
+    match /users/{userId} {
+      allow get: if true; // Public view
+      allow list: if true; // Public list for portfolios
+      
+      allow create: if isSignedIn() 
+                    && isOwner(userId)
+                    && request.resource.data.role == 'user' // Users can only create themselves as 'user'
+                    && request.resource.data.keys().hasAll(['email', 'name', 'role', 'createdAt'])
+                    && request.resource.data.createdAt == request.time;
+
+      allow update: if isSignedIn() 
+                    && (isOwner(userId) || isAdmin())
+                    && (
+                      // Action: Edit Profile (User)
+                      (isOwner(userId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'bio', 'stack', 'hardSkills', 'softSkills', 'experience'])) ||
+                      // Action: Admin Moderation
+                      (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role']))
+                    );
+      
+      allow delete: if isAdmin();
+    }
+
+    // Certificates Collection
+    match /certificates/{certId} {
+      allow get: if true; // Public verification
+      allow list: if true; // Public list for user portfolios
+      
+      allow create: if isSignedIn() 
+                    && request.resource.data.userId == request.auth.uid
+                    && request.resource.data.status == 'pending'
+                    && request.resource.data.createdAt == request.time;
+      
+      allow update: if isSignedIn() && (
+        // Admin: Verify/Reject
+        (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])) ||
+        // Owner: Edit Title (only if pending)
+        (isOwner(resource.data.userId) && resource.data.status == 'pending' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'issuer', 'date']))
+      );
+      
+      allow delete: if isAdmin() || (isOwner(resource.data.userId) && resource.data.status == 'pending');
+    }
+  }
+}
